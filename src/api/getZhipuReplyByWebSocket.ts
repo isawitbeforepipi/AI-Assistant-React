@@ -36,6 +36,6 @@ export function getZhipuReplyByWebSocket(
   };
 
   ws.onclose = () => {
-    console.log('WebSocket closed');
+    // console.log('WebSocket closed');
   };
 }
