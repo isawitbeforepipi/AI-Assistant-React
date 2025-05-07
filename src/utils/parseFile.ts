@@ -20,7 +20,7 @@ export async function parseFile(file: File): Promise<string> {
 
     const base64Image = await readFileAsBase64;
 
-    const response = await fetch("http://localhost:3001/api/ocr", {
+    const response = await fetch("https://accurate-martha-isawitbeforepipi-4d92e84d.koyeb.app/api/ocr", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

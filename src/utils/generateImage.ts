@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const BASE_URL = "http://localhost:3001/api/generate";
+const BASE_URL = "https://accurate-martha-isawitbeforepipi-4d92e84d.koyeb.app/api/generate";
 
 // 提交提示词，返回任务 ID
 const submitPrompt = async (prompt: string): Promise<string | null> => {

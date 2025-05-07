@@ -5,7 +5,7 @@ export function getZhipuReplyByWebSocket(
   onDone: () => void,
   onError: (err: any) => void
 ) {
-  const ws = new WebSocket('ws://localhost:3001');
+  const ws = new WebSocket('wss://accurate-martha-isawitbeforepipi-4d92e84d.koyeb.app');
 
   ws.onopen = () => {
     ws.send(JSON.stringify({ messages: chatHistory }));
