@@ -1,5 +1,4 @@
-import { useEffect, useRef, useState } from "react";
-
+import { useRef, useState } from "react";
 export const useSpeechRecognition = () => {
   const recognitionRef = useRef<SpeechRecognition | null>(null);
   const [listening, setListening] = useState(false);
@@ -21,7 +20,7 @@ export const useSpeechRecognition = () => {
       onResult(transcript);
     };
 
-    recognition.onerror = (event) => {
+    recognition.onerror = (event: SpeechRecognitionErrorEvent) => {
       console.error("语音识别错误", event.error);
     };
 

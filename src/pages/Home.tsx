@@ -15,7 +15,7 @@ import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 interface ChatMessage {
   sender: 'user' | 'ai';
   content: string;
-  image?: string; 
+  image?: string|null; 
 }
 
 type State = {
@@ -101,9 +101,9 @@ const Home: React.FC = () => {
   const currentAIMessageRef = useRef('');
   const { speak, cancel } = useTextToSpeech();  // 使用 Hook
   const { saveMessage, getMessages, clearAllMessages, isDBReady } = useIndexedDB();
-  const [speakingIndex, setSpeakingIndex] = useState(null);
+  const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
 
-  const handleVoiceClick = (msg,index) => {
+  const handleVoiceClick = (msg: ChatMessage, index: number) => {
     const cleanContent = msg.content.replace(/[\p{Emoji_Presentation}\p{Emoji}\u200D]+/gu, '');
     if (speakingIndex === index) {
       cancel();
@@ -132,13 +132,25 @@ const Home: React.FC = () => {
   const { startListening, stopListening, listening } = useSpeechRecognition();
 
   // 在组件顶部添加引用
+  // const virtuosoRef = useRef<VirtuosoHandle>(null);
+  // // 每次 messages 或 loading 变化时滚动到底部
+  // useEffect(() => {
+  //   if (virtuosoRef.current && messages.length > 0) {
+  //     virtuosoRef.current.scrollToIndex(messages.length - 1, {
+  //       behavior: "smooth",
+  //       align: "end",
+  //     });
+  //   }
+  // }, [messages.length, loading]); // 依赖 messages.length 和 loading
+
   const virtuosoRef = useRef<VirtuosoHandle>(null);
   // 每次 messages 或 loading 变化时滚动到底部
   useEffect(() => {
     if (virtuosoRef.current && messages.length > 0) {
-      virtuosoRef.current.scrollToIndex(messages.length - 1, {
-        behavior: "smooth",
-        align: "end",
+      virtuosoRef.current.scrollToIndex({
+        index: messages.length - 1,
+        align: 'end',
+        behavior: 'smooth',
       });
     }
   }, [messages.length, loading]); // 依赖 messages.length 和 loading
@@ -176,7 +188,7 @@ const Home: React.FC = () => {
         const imageBase64 = await fileToBase64(file);
 
 
-        const userMessage = {
+        const userMessage: ChatMessage = {
           sender: 'user',
           content: '我上传了一张图片',
           image:  imageBase64,
@@ -189,7 +201,7 @@ const Home: React.FC = () => {
         // 保存到 IndexedDB
         saveMessage(userMessage);
       } else {
-        const userMessage = {
+        const userMessage :ChatMessage= {
           sender: 'user',
           content: `${file.name}`,
         };
@@ -204,7 +216,7 @@ const Home: React.FC = () => {
       }
       
       const isEmptyText = text.trim() === '这张图片似乎没有文字内容。';
-      const aiMessage = {
+      const aiMessage:ChatMessage = {
         sender: 'ai',
         content: isEmptyText
           ? text
@@ -222,7 +234,7 @@ const Home: React.FC = () => {
       console.error("File parsing error:", err.message);
       toast.error("文件解析失败：" + err.message);
   
-      const errorMessage = {
+      const errorMessage:ChatMessage = {
         sender: 'ai',
         content: `❌ 文件解析失败：${err.message}`,
       };
@@ -249,7 +261,7 @@ const Home: React.FC = () => {
     dispatch({ type: 'SET_LOADING', loading: true });
   
     // 添加临时加载提示
-    const loadingMessage = { sender: 'ai', content: '图像生成中，请稍候...' };
+    const loadingMessage:ChatMessage = { sender: 'ai', content: '图像生成中，请稍候...' };
     dispatch({ type: 'ADD_MESSAGE', message: loadingMessage });
   
     try {
@@ -257,7 +269,7 @@ const Home: React.FC = () => {
   
       // 移除“图像生成中”提示
       dispatch({ type: 'REMOVE_LAST_AI_MESSAGE' });
-      let aiMessage;
+      let aiMessage:ChatMessage;
   
       if (imageUrl) {
         // // 添加生成的图像消息
@@ -288,7 +300,7 @@ const Home: React.FC = () => {
     } catch (err: any) {
       // 出错时移除加载中的提示
       dispatch({ type: 'REMOVE_LAST_AI_MESSAGE' });
-      const errorMessage = {
+      const errorMessage:ChatMessage = {
         sender: 'ai',
         content: `图像生成失败：${err.message}`,
       };
@@ -327,7 +339,7 @@ const Home: React.FC = () => {
   const handleSendMessage = async () => {
     if (!message.trim()) return;
   
-    const userMessage = { sender: 'user', content: message };
+    const userMessage:ChatMessage = { sender: 'user', content: message };
     dispatch({ type: 'ADD_MESSAGE', message: userMessage });
     setMessage('');
 
@@ -347,7 +359,7 @@ const Home: React.FC = () => {
 
     dispatch({ type: 'SET_LOADING', loading: true });
   
-    const chatHistory = [
+    const chatHistory:{ role: 'user' | 'assistant'; content: string }[]  = [
       ...state.messages,
       userMessage,
     ].slice(-5).map((msg) => ({
