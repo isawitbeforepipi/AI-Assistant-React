@@ -12,20 +12,20 @@
 
 ## 项目截图
 
-![项目界面](public/项目界面.png)  
 项目界面
+![项目界面](public/项目界面.png)
 
-![聊天回复](public/聊天回复.png)  
 聊天回复
+![聊天回复](public/聊天回复.png)
 
-![图片生成](public/图片生成.png)  
 图片生成
+![图片生成](public/图片生成.png)
 
-![图片OCR](public/图片OCR.png)  
 图片 OCR 识别
+![图片OCR](public/图片OCR.png)
 
-![项目演示](public/项目演示.gif)  
 项目演示
+![项目演示](public/项目演示.gif)
 
 ## 功能特性
 
