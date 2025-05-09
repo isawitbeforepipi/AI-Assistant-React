@@ -50,7 +50,7 @@
 ### 克隆项目
 
 ```bash
-git clone https://github.com/你的用户名/AI-智能助手.git
+git clone https://github.com/isawitbeforepipi/AI-Assistant-React.git
 cd AI-智能助手
 ```
 
@@ -75,14 +75,11 @@ node server.js
 
 ###环境变量配置
 
-````
-
 在项目 backend 目录创建 .env 文件，填入以下配置：
+
+```bash
 ZHIPU_API_KEY = your_zhipu_api_key
 BAIDU_OCR_API_KEY = your_baidu_ocr_api_key
 BAIDU_OCR_SECRET_KEY = your_baidu_ocr_secret_key
 GENERATE_IMG_API_KEY = your_aliyun_api_key
-
-
 ```
-````
