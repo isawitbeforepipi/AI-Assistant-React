@@ -12,30 +12,20 @@
 
 ## 项目截图
 
-<figure>
-  <img src="public/项目界面.png" alt="项目界面" />
-  <figcaption>项目界面</figcaption>
-</figure>
+![项目界面](public/项目界面.png)  
+项目界面
 
-<figure>
-  <img src="public/图片生成.png" alt="图片生成" />
-  <figcaption>图片生成</figcaption>
-</figure>
+![聊天回复](public/聊天回复.png)  
+聊天回复
 
-<figure>
-  <img src="public/图片OCR.png" alt="图片OCR" />
-  <figcaption>图片OCR</figcaption>
-</figure>
+![图片生成](public/图片生成.png)  
+图片生成
 
-<figure>
-  <img src="public/聊天回复.png" alt="聊天回复" />
-  <figcaption>聊天回复</figcaption>
-</figure>
+![图片OCR](public/图片OCR.png)  
+图片 OCR 识别
 
-<figure>
-  <img src="public/项目演示.gif" alt="项目演示" />
-  <figcaption>项目演示</figcaption>
-</figure>
+![项目演示](public/项目演示.gif)  
+项目演示
 
 ## 功能特性
 
