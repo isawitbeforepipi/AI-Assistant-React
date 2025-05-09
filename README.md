@@ -49,25 +49,32 @@
 
 ### 克隆项目
 
-````bash
+```bash
 git clone https://github.com/你的用户名/AI-智能助手.git
 cd AI-智能助手
+```
 
 ### 前端安装与启动
+
 进入 项目根目录并安装依赖：
+
 ```bash
 npm install
 npm start
+```
 
 ### 后端安装与启动
+
 进入 backend 目录并安装依赖：
+
 ```bash
 cd backend
 npm install
 node server.js
-
+```
 
 ###环境变量配置
+
 ````
 
 在项目 backend 目录创建 .env 文件，填入以下配置：
@@ -76,6 +83,6 @@ BAIDU_OCR_API_KEY = your_baidu_ocr_api_key
 BAIDU_OCR_SECRET_KEY = your_baidu_ocr_secret_key
 GENERATE_IMG_API_KEY = your_aliyun_api_key
 
-```
 
 ```
+````
