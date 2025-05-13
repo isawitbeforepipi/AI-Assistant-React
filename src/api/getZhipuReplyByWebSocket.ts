@@ -7,7 +7,6 @@ export function getZhipuReplyByWebSocket(
   onError: (err: any) => void  //失败回调
 ) {
   const wsUrl = import.meta.env.VITE_BACKEND_WS_URL;
-  console.log('WebSocket URL:', import.meta.env.VITE_BACKEND_URL); 
   //创建WebSocket连接
   const ws = new WebSocket(wsUrl);
   
