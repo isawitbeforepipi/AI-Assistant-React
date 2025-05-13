@@ -1,6 +1,7 @@
 import { useRef, useState } from 'react';
 
 export function useTextToSpeech() {
+  //创建一个 ref 保存语音合成器对象
   const synthRef = useRef(window.speechSynthesis);
   const [isSpeaking, setIsSpeaking] = useState(false);
 
@@ -9,9 +10,9 @@ export function useTextToSpeech() {
 
     const utterance = new SpeechSynthesisUtterance(text);
     utterance.lang = lang;
-    utterance.rate = 1;
-    utterance.pitch = 1;
-    utterance.volume = 1;
+    utterance.rate = 1;  //语速
+    utterance.pitch = 1;  //音调
+    utterance.volume = 1;  //音量
 
     // 如果正在朗读，先取消
     if (synthRef.current.speaking) {

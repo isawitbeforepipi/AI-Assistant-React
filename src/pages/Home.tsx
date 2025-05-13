@@ -2,32 +2,32 @@ import { useState, useMemo, useReducer,useRef,useEffect } from 'react';
 import Tooltip from '../components/Tooltip';
 import { getZhipuReplyByWebSocket } from '../api/getZhipuReplyByWebSocket';
 import ReactMarkdown from 'react-markdown';
-import { parseFile } from "../utils/parseFile";
+import { parseFile } from "../api/parseFile.ts";
 import { toast } from 'react-hot-toast';
 import { useSpeechRecognition } from '../hooks/useSpeechRecognition';
-import { generateImage } from '../utils/generateImage';
+import { generateImage } from '../api/generateImage.ts';
 import { useTextToSpeech } from '../hooks/useTextToSpeech';
 import { Volume2 } from 'lucide-react';
 import { useIndexedDB } from '../hooks/useIndexedDB.ts';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 
-
+//单条消息的结构
 interface ChatMessage {
-  sender: 'user' | 'ai';
+  sender: 'user' | 'assistant';
   content: string;
   image?: string|null; 
 }
 
 type State = {
-  messages: ChatMessage[];  // 只存储一个消息数组
-  loading: boolean;         // 只存储一个加载状态
+  messages: ChatMessage[];  // 存储消息数组
+  loading: boolean;         // 存储加载状态
 };
 
+//定义了 reducer 支持的所有操作
 type Action =
   | { type: 'ADD_MESSAGE'; message: ChatMessage }
   | { type: 'SET_LOADING'; loading: boolean }
-  | { type: 'SET_MESSAGES'; messages: ChatMessage[] }
-  | { type: 'RESET_MESSAGES' }
+  | { type: 'RESET_MESSAGES' }  //清空聊天记录
   | { type: 'REMOVE_LAST_AI_MESSAGE' }
   | { type: 'INIT_MESSAGES'; payload: ChatMessage[] };
 
@@ -36,25 +36,27 @@ const initialState: State = {
   loading: false,
 };
 
+//根据不同的action更新状态
 function chatReducer(state: State, action: Action): State {
   switch (action.type) {
     case 'ADD_MESSAGE': {
-      const { message } = action;
-      const lastMessages = state.messages;
+      const { message } = action;  //获取新的聊天
+      const lastMessages = state.messages;  //前一次聊天
       
-      // 如果是 AI 并且上一条是 AI 的，则拼接
-      if (message.sender === 'ai' && lastMessages.length > 0 && lastMessages[lastMessages.length - 1].sender === 'ai') {
+      // 如果是 AI 并且上一条也是 AI 的，则拼接
+      //这是前端实现流式输出的基础
+      if (message.sender === 'assistant' && lastMessages.length > 0 && lastMessages[lastMessages.length - 1].sender === 'assistant') {
         const updatedMessages = [...lastMessages];
         updatedMessages[updatedMessages.length - 1] = {
           ...updatedMessages[updatedMessages.length - 1],
-          content: message.content,
+          content: message.content, //将最后一条消息的内容替换为当前新的内容
         };
         return {
           ...state,
           messages: updatedMessages,
         };
       }
-    
+      //如果上一个消息不是 AI，则直接将新消息添加到 messages 数组的末尾。
       return {
         ...state,
         messages: [...lastMessages, message],
@@ -64,7 +66,7 @@ function chatReducer(state: State, action: Action): State {
     case 'SET_LOADING': {
       return {
         ...state,
-        loading: action.loading,
+        loading: action.loading, //更新loading
       };
     }
     case 'RESET_MESSAGES': {
@@ -73,16 +75,18 @@ function chatReducer(state: State, action: Action): State {
         messages: [],
       };
     }
+      //从indexDB初始化消息
     case 'INIT_MESSAGES': {
       return {
         ...state,
         messages: action.payload,
       };
     }
+    //主要是为了处理加载时显示的那一段消息，加载成功就可以删除
     case 'REMOVE_LAST_AI_MESSAGE': {
       const updated = [...state.messages];
       // 移除最后一条 AI 消息
-      if (updated.length > 0 && updated[updated.length - 1].sender === 'ai') {
+      if (updated.length > 0 && updated[updated.length - 1].sender === 'assistant') {
         updated.pop();
       }
       return {
@@ -97,11 +101,44 @@ function chatReducer(state: State, action: Action): State {
 
 const Home: React.FC = () => {
   const [state, dispatch] = useReducer(chatReducer, initialState);
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState(''); //输入框中的消息
   const currentAIMessageRef = useRef('');
-  const { speak, cancel } = useTextToSpeech();  // 使用 Hook
+  const { speak, cancel } = useTextToSpeech();  
   const { saveMessage, getMessages, clearAllMessages, isDBReady } = useIndexedDB();
   const [speakingIndex, setSpeakingIndex] = useState<number | null>(null);
+  const { startListening, stopListening, listening } = useSpeechRecognition();
+  const virtuosoRef = useRef<VirtuosoHandle>(null);
+  const messages = state.messages;
+  const loading = state.loading;
+
+  const wordCount = useMemo(() => {
+    return (message && typeof message === 'string' ? message.trim().length : 0);
+  }, [message]);
+
+  // 每次新增消息时滚动到底部
+  useEffect(() => {
+    if (virtuosoRef.current && messages.length > 0) {
+      virtuosoRef.current.scrollToIndex({
+        index: messages.length - 1,
+        align: 'end',
+        behavior: 'smooth',
+      });
+    }
+  }, [messages.length]); 
+  
+  //加载indexDB中保存的历史记录
+  useEffect(() => {
+    if (!isDBReady) return;
+    const loadMessages = async () => {
+      try {
+        const messages = await getMessages();
+        dispatch({ type: 'INIT_MESSAGES', payload: messages });
+      } catch (error) {
+        console.error('Failed to load messages:', error);
+      }
+    };
+    loadMessages();
+  }, [isDBReady]);
 
   const handleVoiceClick = (msg: ChatMessage, index: number) => {
     const cleanContent = msg.content.replace(/[\p{Emoji_Presentation}\p{Emoji}\u200D]+/gu, '');
@@ -114,110 +151,78 @@ const Home: React.FC = () => {
     }
   };
   
-  
-  
-
-  const messages = state.messages;
   const clearHistory = () => {
     dispatch({ type: 'RESET_MESSAGES' }); // 清空消息的全局状态
     clearAllMessages(); // 清空本地存储的消息数据
   };
 
-
-  const loading = state.loading;
-  // const wordCount = useMemo(() => message.trim().length, [message]);
-  const wordCount = useMemo(() => {
-    return (message && typeof message === 'string' ? message.trim().length : 0);
-  }, [message]);
-  const { startListening, stopListening, listening } = useSpeechRecognition();
-
-  // 在组件顶部添加引用
-  // const virtuosoRef = useRef<VirtuosoHandle>(null);
-  // // 每次 messages 或 loading 变化时滚动到底部
-  // useEffect(() => {
-  //   if (virtuosoRef.current && messages.length > 0) {
-  //     virtuosoRef.current.scrollToIndex(messages.length - 1, {
-  //       behavior: "smooth",
-  //       align: "end",
-  //     });
-  //   }
-  // }, [messages.length, loading]); // 依赖 messages.length 和 loading
-
-  const virtuosoRef = useRef<VirtuosoHandle>(null);
-  // 每次 messages 或 loading 变化时滚动到底部
-  useEffect(() => {
-    if (virtuosoRef.current && messages.length > 0) {
-      virtuosoRef.current.scrollToIndex({
-        index: messages.length - 1,
-        align: 'end',
-        behavior: 'smooth',
-      });
-    }
-  }, [messages.length, loading]); // 依赖 messages.length 和 loading
-
-
   const handleVoiceInput = () => {
+    //开始语音识别
     if (!listening) {
       startListening((text) => {
         setMessage((prev) => prev + text); // 将识别的内容加到输入框中
       });
     } else {
-      stopListening();
+      stopListening(); //如果正在监听，则停止监听
     }
   };
-
- 
+  
+  //将一个 File 对象转换成 Base64 编码的字符串。
   const fileToBase64 = (file: File): Promise<string> => {
     return new Promise((resolve, reject) => {
       const reader = new FileReader();
+      //readAsDataURL读取完成后，将结果传递给 resolve 返回
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = reject;
+      //读取文件，将文件内容转换为 Data URL（Base64 编码的字符串）
       reader.readAsDataURL(file);
     });
   };
 
+  //上传图片文件，进行OCR解析
   const handleFileSelect = async (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
+    const file = event.target.files?.[0];//如果文件列表存在，获取第一个文件
     if (!file) return;
+
+    // 判断文件类型是否为图片
+    if (!file.type.startsWith("image/")) {
+      // 如果不是图片，显示提示信息
+      toast.error("只能上传图片文件");
+      return;
+    }
+
+    // 设置加载状态为 true
+    dispatch({ type: 'SET_LOADING', loading: true });
+
+     //生成图片消息，并保存到indexdb
+    const imageBase64 = await fileToBase64(file);
+    const userMessage: ChatMessage = {
+      sender: 'user',
+      content: '我上传了一张图片',
+      image:  imageBase64,
+    };
+
+    dispatch({
+      type: 'ADD_MESSAGE',
+      message: userMessage
+    });
+    // 保存到 IndexedDB
+    saveMessage(userMessage);
+
+    dispatch({
+      type: 'ADD_MESSAGE',
+      message: { sender: 'assistant', content: '' },  // 空的ai消息
+    });
   
     try {
-      const text = await parseFile(file);
-      
-      if (file.type.startsWith("image/")) {
-        // const imageUrl = URL.createObjectURL(file);
-        const imageBase64 = await fileToBase64(file);
+      const text = await parseFile(file); //返回OCR解析结果
 
-
-        const userMessage: ChatMessage = {
-          sender: 'user',
-          content: '我上传了一张图片',
-          image:  imageBase64,
-        };
-  
-        dispatch({
-          type: 'ADD_MESSAGE',
-          message: userMessage
-        });
-        // 保存到 IndexedDB
-        saveMessage(userMessage);
-      } else {
-        const userMessage :ChatMessage= {
-          sender: 'user',
-          content: `${file.name}`,
-        };
-  
-        dispatch({
-          type: 'ADD_MESSAGE',
-          message: userMessage,
-        });
-  
-        // 保存到 IndexedDB
-        saveMessage(userMessage);
-      }
+      dispatch({ type: 'REMOVE_LAST_AI_MESSAGE' });
       
+      //根据解析结果，设置ai消息，并保存到indexdb
       const isEmptyText = text.trim() === '这张图片似乎没有文字内容。';
       const aiMessage:ChatMessage = {
-        sender: 'ai',
+        sender: 'assistant',
         content: isEmptyText
           ? text
           : `OCR识别成功，内容如下：\n\n${text}`,
@@ -231,25 +236,25 @@ const Home: React.FC = () => {
       // 保存到 IndexedDB
       saveMessage(aiMessage);
     } catch (err: any) {
-      console.error("File parsing error:", err.message);
+      // console.error("File parsing error:", err.message);
       toast.error("文件解析失败：" + err.message);
-  
       const errorMessage:ChatMessage = {
-        sender: 'ai',
+        sender: 'assistant',
         content: `❌ 文件解析失败：${err.message}`,
       };
-  
       dispatch({
         type: 'ADD_MESSAGE',
         message: errorMessage,
       });
-  
       // 保存错误信息到 IndexedDB
       saveMessage(errorMessage);
+    }finally {
+      // 无论成功或失败，都设置loading为false
+      dispatch({ type: 'SET_LOADING', loading: false });
     }
   };
 
-
+  //根据输入框文字生成图像
   const handleImageGenerate = async () => {
     if (!message.trim()) return;
   
@@ -259,106 +264,54 @@ const Home: React.FC = () => {
   
     // 设置加载状态为 true，开始图像生成
     dispatch({ type: 'SET_LOADING', loading: true });
-  
     // 添加临时加载提示
-    const loadingMessage:ChatMessage = { sender: 'ai', content: '图像生成中，请稍候...' };
-    dispatch({ type: 'ADD_MESSAGE', message: loadingMessage });
+    dispatch({ type: 'ADD_MESSAGE', message: { sender: 'assistant', content: '' } });
   
     try {
       const { imageUrl, base64Images} = await generateImage(message); // 调用生成图像的 API
-  
       // 移除“图像生成中”提示
       dispatch({ type: 'REMOVE_LAST_AI_MESSAGE' });
-      let aiMessage:ChatMessage;
-  
       if (imageUrl) {
-        // // 添加生成的图像消息
-        // aiMessage = { sender: 'ai', content: '', image: imageUrl };
-        // dispatch({
-        //   type: 'ADD_MESSAGE',
-        //   message: aiMessage,
-        // });
-        aiMessage = { sender: 'ai', content: '', image: base64Images }; // 存 base64
+        let aiMessage:ChatMessage = { sender: 'assistant', content: '', image: base64Images }; // 存 base64
         dispatch({
           type: 'ADD_MESSAGE',
           message: aiMessage,
         });
-
         saveMessage(aiMessage); // 现在存的是 base64，可以刷新后读取
       } else {
-        // 图像生成失败的提示消息
-        aiMessage = {
-          sender: 'ai',
-          content: '图像生成失败，请稍后重试。',
-        };
-        dispatch({
-          type: 'ADD_MESSAGE',
-          message: aiMessage,
-        });
-        saveMessage(aiMessage);
+       throw new Error('图像生成失败，请稍后重试。'); 
       }
     } catch (err: any) {
       // 出错时移除加载中的提示
       dispatch({ type: 'REMOVE_LAST_AI_MESSAGE' });
-      const errorMessage:ChatMessage = {
-        sender: 'ai',
+      const errorMessage: ChatMessage = {
+        sender: 'assistant',
         content: `图像生成失败：${err.message}`,
       };
-  
-      // 错误提示
       dispatch({
         type: 'ADD_MESSAGE',
         message: errorMessage,
       });
-
-       // 保存错误信息到 IndexedDB
        saveMessage(errorMessage);
     } finally {
       // 无论成功还是失败，最后都要更新加载状态为 false
       dispatch({ type: 'SET_LOADING', loading: false });
     }
-    
   };
-  
-  useEffect(() => {
-    if (!isDBReady) return;
-  
-    const loadMessages = async () => {
-      try {
-        const messages = await getMessages();
-        dispatch({ type: 'INIT_MESSAGES', payload: messages });
-      } catch (error) {
-        console.error('Failed to load messages:', error);
-      }
-    };
-  
-    loadMessages();
-  }, [isDBReady]);
-
 
   const handleSendMessage = async () => {
     if (!message.trim()) return;
-  
+    
+
+    //发送用户消息
     const userMessage:ChatMessage = { sender: 'user', content: message };
     dispatch({ type: 'ADD_MESSAGE', message: userMessage });
     setMessage('');
-
-    // 保存到 IndexedDB
     saveMessage(userMessage);
-
-    // 获取历史消息并显示
-    try {
-      const storedMessages = await getMessages();
-      dispatch({
-        type: 'SET_MESSAGES',
-        messages: storedMessages,
-      });
-    } catch (err) {
-      console.error('Error fetching messages from IndexedDB:', err);
-    }
 
     dispatch({ type: 'SET_LOADING', loading: true });
   
+    //构建一个包含了最近五条消息的历史记录，以便让AI能有记忆
     const chatHistory:{ role: 'user' | 'assistant'; content: string }[]  = [
       ...state.messages,
       userMessage,
@@ -366,46 +319,45 @@ const Home: React.FC = () => {
       role: msg.sender === 'user' ? 'user' : 'assistant',
       content: msg.content,
     }));
-  
+    
+    //重置 currentAIMessageRef.current，用于存储 AI 回复的拼接文本。
     currentAIMessageRef.current = '';
   
     // 添加一条空消息用于后续拼接打字机文本
     dispatch({
       type: 'ADD_MESSAGE',
-      message: { sender: 'ai', content: '' },
+      message: { sender: 'assistant', content: '' },
     });
-
     
-
+    //通过 WebSocket 向后端发送请求并获取 AI 回复
     getZhipuReplyByWebSocket(
       chatHistory,
+      //分步显示AI回复内容，实现打字机效果
       (partial) => {
         currentAIMessageRef.current += partial;
         dispatch({
           type: 'ADD_MESSAGE',
-          message: { sender: 'ai', content: currentAIMessageRef.current },
+          message: { sender: 'assistant', content: currentAIMessageRef.current },
         });
       },
+      //成功回调
       () => {
         dispatch({ type: 'SET_LOADING', loading: false });
-    
-        // ✅ 保存 AI 消息
         const aiMessage = {
-          sender: 'ai',
+          sender: 'assistant',
           content: currentAIMessageRef.current,
         };
         saveMessage(aiMessage);
       },
-      (err) => {
-        console.error('WebSocket error:', err);
+      //失败回调
+      () => {
+        // console.error('WebSocket error:', err);
         dispatch({
           type: 'ADD_MESSAGE',
-          message: { sender: 'ai', content: '❌ 出现错误，请稍后重试' },
+          message: { sender: 'assistant', content: '❌ 出现错误，请稍后重试' },
         });
         dispatch({ type: 'SET_LOADING', loading: false });
-    
-        // ✅ 保存 AI 错误消息
-        saveMessage({ sender: 'ai', content: '❌ 出现错误，请稍后重试' });
+        saveMessage({ sender: 'assistant', content: '❌ 出现错误，请稍后重试' });
       }
     );
 };
@@ -413,12 +365,11 @@ const Home: React.FC = () => {
   return (
     <div className="min-h-screen bg-gradient-to-b from-blue-200 to-blue-400 flex items-center justify-center p-2 md:p-4 font-[Comic_Sans_MS]">
       <div className="relative w-full max-w-3xl px-1 md:px-2">
-        {/* 聊天卡片 - 移动端高度调整 */}
+        {/* 聊天卡片 */}
         <div className="w-full bg-white shadow-xl rounded-xl md:rounded-2xl h-[80vh] max-h-[700px] flex flex-col p-3 md:p-6 ">
-          {/* 标题区域 - 移动端缩小文字 */}
+          {/* 标题区域 */}
           <div className="text-lg md:text-xl font-semibold mb-2 md:mb-4 flex items-center justify-between text-gray-700">
             <div className="flex items-center space-x-2">
-              {/* <span>{selectedRole.emoji}</span> */}
               <span>AI小助手 为你服务</span>
             </div>
             <button
@@ -431,7 +382,7 @@ const Home: React.FC = () => {
             </button>
           </div>
 
-          {/* 消息区域 - 移动端气泡优化 */} 
+          {/* 消息区域 */} 
           <div className="flex-1 overflow-hidden">
             {messages.length === 0 ? (
               <div className="flex h-full items-center justify-center text-gray-400 text-xs md:text-sm text-center px-2 md:px-4">
@@ -440,89 +391,85 @@ const Home: React.FC = () => {
             ) : (
                 <Virtuoso
                   ref={virtuosoRef}
-                followOutput="auto" // 自动滚动到最新内容
-                style={{ height: '100%', marginBottom: 10 }}  
+                  followOutput="auto" // 自动滚动到最新内容
+                  style={{ height: '100%', marginBottom: 10 }}  
                   className="custom-scrollbar"
-                totalCount={messages.length}  // 设置消息的总数
-                itemContent={(index) => {
-                  const msg = messages[index];
-                  const isUser = msg.sender === 'user';
-                  const avatar = isUser ? '🙋' : '🤖';
-                  const isTyping = msg.sender === 'ai' && msg.content === '' && loading;
-                  const isSpeaking = speakingIndex === index;
-                  return (
-                    <div
-                      key={index}
-                      className={`flex items-start mb-1 md:mb-2 ${isUser ? 'justify-end' : 'justify-start'}`}
-                    >
-                      {!isUser && (
-                        <div className="text-xl md:text-2xl mr-1 md:mr-2">{avatar}</div>
-                      )}
-      
+                  totalCount={messages.length}  // 设置消息的总数
+                  itemContent={(index) => {
+                    const msg = messages[index];
+                    const isUser = msg.sender === 'user';
+                    const avatar = isUser ? '🙋' : '🤖';
+                    const isTyping = msg.sender === 'assistant' && !msg.content && !msg.image && loading;
+                    const isSpeaking = speakingIndex === index;
+                    return (
                       <div
-                        className={`max-w-[85%] md:max-w-[70%] px-3 py-1 md:px-4 md:py-2 rounded-xl md:rounded-2xl shadow break-words text-sm md:text-base
-                          ${isUser ? 'bg-yellow-300 text-white' : 'bg-gray-200 text-gray-800'}`}
+                        key={index}
+                        className={`flex items-start mb-1 md:mb-2 ${isUser ? 'justify-end' : 'justify-start'}`}
                       >
-                        {msg.image && (
-                          <div className="mt-2">
-                            <img src={msg.image} alt="图片预览" className="max-w-full h-auto rounded-lg shadow" />
-                            {msg.sender === 'ai' && (
-                              <a
-                                href={msg.image}
-                                download="generated-image.png"
-                                className="block text-center text-xs mt-2 text-blue-500"
-                              >
-                                点击下载图片
-                              </a>
-                            )}
-                          </div>
+                        {!isUser && (
+                          <div className="text-xl md:text-2xl mr-1 md:mr-2">{avatar}</div>
                         )}
-                        {msg.content && (
-                          <div className="relative">
-                            <ReactMarkdown>{msg.content}</ReactMarkdown>
-
-                            {/* 语音播放按钮作为新的一行 */}
-                            {msg.sender === 'ai' && !msg.image && !loading && (
-                              <div className="mt-1 flex justify-end items-center space-x-1">
-                                <button
-                                  onClick={() => {
-                                    handleVoiceClick(msg,index)} 
-                                  }
-                                  className="text-gray-500 hover:text-black relative"
-                                  title={isSpeaking ? "取消朗读" : "朗读此回复"}
+                        <div
+                          className={`max-w-[85%] md:max-w-[70%] px-3 py-1 md:px-4 md:py-2 rounded-xl md:rounded-2xl shadow break-words text-sm md:text-base
+                            ${isUser ? 'bg-yellow-300 text-white' : 'bg-gray-200 text-gray-800'}`}
+                        > 
+                        
+                          {msg.image && (
+                            <div className="mt-2">
+                              <img src={msg.image} alt="图片预览" className="max-w-full h-auto rounded-lg shadow" />
+                              {msg.sender === 'assistant' && (
+                                <a
+                                  href={msg.image}
+                                  download="generated-image.png"
+                                  className="block text-center text-xs mt-2 text-blue-500"
                                 >
-                                  <Volume2 className={`w-4 h-4 transition-all duration-300 ${isSpeaking ? 'animate-pulse text-green-500' : ''}`} />
-                                </button>
-
-                                {/* 可选：加一个播放状态波纹点 */}
-                                {isSpeaking && (
-                                  <span className="w-2 h-2 rounded-full bg-green-500 animate-ping"></span>
-                                )}
-                              </div>
-                            )}
-                          </div>
-                        )}
-      
-                        {isTyping && (
-                          <div className="text-gray-500 italic animate-pulse">
-                            AI小助手 正在输入...
-                          </div>
+                                  点击下载图片
+                                </a>
+                              )}
+                            </div>
+                          )}
+                         
+                          {msg.content && (
+                            <div className="relative">
+                              <ReactMarkdown>{msg.content}</ReactMarkdown>
+                              {/* 语音播放按钮 */}
+                              {msg.sender === 'assistant' && !msg.image && !loading && (
+                                <div className="mt-1 flex justify-end items-center space-x-1">
+                                  <button
+                                    onClick={() => {
+                                      handleVoiceClick(msg,index)} //朗读当前消息
+                                    }
+                                    className="text-gray-500 hover:text-black relative"
+                                    title={isSpeaking ? "取消朗读" : "朗读此回复"}
+                                  > 
+                                    <Volume2 className={`w-4 h-4 transition-all duration-300 ${isSpeaking ? 'animate-pulse text-green-500' : ''}`} />
+                                  </button>
+                                  {isSpeaking && (
+                                    <span className="w-2 h-2 rounded-full bg-green-500 animate-ping"></span>
+                                  )}
+                                </div>
+                              )}
+                            </div>
+                          )}
+        
+                          {isTyping && (
+                            <div className="text-gray-500 italic animate-pulse">
+                              AI小助手正在努力工作中...
+                            </div>
+                          )}
+                        </div>
+        
+                        {isUser && (
+                          <div className="text-xl md:text-2xl ml-1 md:ml-2">{avatar}</div>
                         )}
                       </div>
-      
-                      {isUser && (
-                        <div className="text-xl md:text-2xl ml-1 md:ml-2">{avatar}</div>
-                      )}
-                    </div>
-                  );
-                }}
+                    );
+                  }}
               />
             )}
           </div>
-          
-        
 
-          {/* 输入区域 - 移动端布局优化 */}
+          {/* 输入区域 */}
           <div className="relative bg-white border-2 border-gray-300 rounded-lg md:rounded-xl p-2 md:p-4 mt-3 md:mt-6">
             <div className="flex flex-col space-y-1 md:space-y-2">
             <input

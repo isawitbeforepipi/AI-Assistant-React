@@ -37,7 +37,10 @@ router.post("/submit", async (req, res) => {
     // 获取生成任务的 taskId
     const taskId = result.data?.output?.task_id;
     if (taskId) {
-      res.json({ taskId });
+      // 后端开始轮询任务状态
+      const imageData = await pollResult(taskId); // 轮询任务状态直到成功或失败
+      return res.json(imageData);
+      // res.json({ taskId });
     } else {
       res.status(500).json({ error: "未获取到 task_id", detail: result.data });
     }
@@ -53,42 +56,41 @@ const urlToBase64 = async (url) => {
   const contentType = response.headers["content-type"];
   return `data:${contentType};base64,${base64}`;
 };
-router.get("/result/:taskId", async (req, res) => {
-  const { taskId } = req.params;
-  if (!taskId) {
-    return res.status(400).json({ error: "缺少 taskId 参数" });
-  }
 
-  try {
-    const result = await axios.get(
-      `https://dashscope.aliyuncs.com/api/v1/tasks/${taskId}`,
-      {
-        headers: {
-          Authorization: `Bearer ${API_KEY}`,
-        },
+// 后端实现轮询，直到任务完成
+const pollResult = async (taskId) => {
+  while (true) {
+    try {
+      const result = await axios.get(
+        `https://dashscope.aliyuncs.com/api/v1/tasks/${taskId}`,
+        {
+          headers: {
+            Authorization: `Bearer ${API_KEY}`,
+          },
+        }
+      );
+
+      const taskStatus = result.data?.output?.task_status;
+      const imageUrls = result.data?.output?.results?.map((r) => r.url) || [];
+
+      if (taskStatus === "SUCCEEDED" && imageUrls.length > 0) {
+        const base64Images = await Promise.all(imageUrls.map(urlToBase64));
+        return {
+          status: "SUCCEEDED",
+          images: imageUrls,
+          base64Images,
+        };
+      } else if (taskStatus === "FAILED") {
+        return { status: "FAILED" };
       }
-    );
 
-    const taskStatus = result.data?.output?.task_status;
-    const imageUrls = result.data?.output?.results?.map((r) => r.url) || [];
-
-    if (taskStatus === "SUCCEEDED" && imageUrls.length > 0) {
-      const base64Images = await Promise.all(imageUrls.map(urlToBase64));
-      return res.json({
-        status: "SUCCEEDED",
-        images: imageUrls,
-        base64Images,
-      });
-    } else if (taskStatus === "FAILED") {
-      return res.json({ status: "FAILED" });
-    } else {
-      // RUNNING、PENDING 等状态，继续轮询
-      return res.json({ status: taskStatus });
+      // 如果任务还没完成，等待2秒再轮询
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+    } catch (err) {
+      console.error("❌ 查询任务出错:", err.message);
+      return { status: "FAILED" };
     }
-  } catch (err) {
-    console.error("❌ 查询任务出错:", err.message);
-    res.status(500).json({ error: err.message });
   }
-});
+};
 
 export default router;

@@ -1,10 +1,11 @@
 import { useState } from 'react';
 
 interface TooltipProps {
-  text: string;
-  children: React.ReactNode;
+  text: string;  // // 要展示的提示文本
+  children: React.ReactNode;  // 要包裹的子元素（鼠标悬停目标）
 }
 
+//用来在鼠标悬停（hover）时显示提示气泡
 const Tooltip: React.FC<TooltipProps> = ({ text, children }) => {
   const [isHovered, setIsHovered] = useState(false);
 

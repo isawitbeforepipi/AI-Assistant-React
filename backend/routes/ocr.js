@@ -1,6 +1,6 @@
 import express from "express";
 import axios from "axios";
-import dotenv from "dotenv";
+import dotenv from "dotenv"; //加载环境变量配置文件
 dotenv.config();
 
 const router = express.Router();
@@ -18,6 +18,7 @@ async function getAccessToken() {
     throw new Error("获取 access_token 失败：" + err.message);
   }
 }
+
 router.post("/", async (req, res) => {
   const { image } = req.body; // 获取 base64 编码的图片
   if (!image) {
@@ -31,11 +32,11 @@ router.post("/", async (req, res) => {
     const result = await axios.post(
       `https://aip.baidubce.com/rest/2.0/ocr/v1/accurate_basic?access_token=${accessToken}`,
       new URLSearchParams({
-        image: image, // 直接传递 base64 编码的图片
-        detect_direction: "false",
-        paragraph: "false",
-        probability: "false",
-        multidirectional_recognize: "false",
+        image: image, // 传递 base64 编码的图片
+        detect_direction: "false", //是否检测文字方向
+        paragraph: "false", //是否识别段落
+        probability: "false", //是否返回识别结果的置信度
+        multidirectional_recognize: "false", //是否进行多方向识别
       }),
       {
         headers: {

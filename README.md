@@ -27,6 +27,14 @@
 项目演示
 ![项目演示](public/项目演示.gif)
 
+## 移动端展示
+
+以下是应用在移动端的界面效果：
+
+![移动端界面1](public/移动端_初始界面.png) &nbsp;&nbsp;
+![移动端界面2](public/移动端_回复.png) &nbsp;&nbsp;
+![移动端界面3](public/移动端_图片生成.png)
+
 ## 功能特性
 
 - **文字输入**：用户可以直接输入文字与助手进行对话。
@@ -60,7 +68,7 @@
 
 ```bash
 git clone https://github.com/isawitbeforepipi/AI-Assistant-React.git
-cd AI-智能助手
+cd AI-SMART-ASSISTANT
 ```
 
 ### 前端安装与启动
