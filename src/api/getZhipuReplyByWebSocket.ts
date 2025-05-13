@@ -6,8 +6,8 @@ export function getZhipuReplyByWebSocket(
   onDone: () => void,  //成功回调，当 WebSocket 连接完成并且服务器发送完毕时调用。
   onError: (err: any) => void  //失败回调
 ) {
-  
   const wsUrl = import.meta.env.VITE_BACKEND_WS_URL;
+  console.log('WebSocket URL:', import.meta.env.VITE_BACKEND_URL); 
   //创建WebSocket连接
   const ws = new WebSocket(wsUrl);
   

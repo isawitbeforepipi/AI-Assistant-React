@@ -31,9 +31,11 @@
 
 以下是应用在移动端的界面效果：
 
-![移动端界面1](public/移动端_初始界面.png) &nbsp;&nbsp;
-![移动端界面2](public/移动端_回复.png) &nbsp;&nbsp;
-![移动端界面3](public/移动端_图片生成.png)
+<p align="center">
+  <img src="public/移动端_初始界面.png" width="30%" />
+  <img src="public/移动端_回复.png" width="30%" />
+  <img src="public/移动端_图片生成.png" width="30%" />
+</p>
 
 ## 功能特性
 
