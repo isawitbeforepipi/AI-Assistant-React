@@ -16,7 +16,7 @@ const PORT = process.env.PORT || 3001;
 const corsOptions = {
   origin:
     process.env.NODE_ENV === "production"
-      ? "https://ai-chatbot-g3h3tluqk-isawitbeforepipis-projects.vercel.app/" // 生产环境：允许来自 Vercel 的请求
+      ? "https://ai-chatbot-g3h3tluqk-isawitbeforepipis-projects.vercel.app" // 生产环境：允许来自 Vercel 的请求
       : "http://localhost:5173", // 本地开发环境：允许来自本地的请求
   methods: ["GET", "POST"], // 允许的 HTTP 方法
 };
