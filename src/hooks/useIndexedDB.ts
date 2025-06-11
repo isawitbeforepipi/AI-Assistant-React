@@ -20,14 +20,11 @@ export const useIndexedDB = () => {
         setError(new Error('Failed to open IndexedDB'));
       };
       
-      // 把打开成功的 IndexedDB 数据库对象 request.result 存入 React 的状态变量 db 中
       request.onsuccess = () => {
         setDb(request.result);
-        setIsDBReady(true); // ✅ 标记初始化完成
+        setIsDBReady(true); 
       }; 
 
-      // 如果是第一次打开（或版本变更）
-      // 创建一个表叫 messages，并设置主键自增。
       request.onupgradeneeded = (event) => {
         const db = (event.target as IDBRequest).result;
         if (!db.objectStoreNames.contains(STORE_NAME)) {
@@ -41,11 +38,8 @@ export const useIndexedDB = () => {
 
   const saveMessage = (message: any) => {
     if (!db) return;
-    //创建一个 读写事务，允许对 messages 这个表进行写入操作
     const transaction = db.transaction(STORE_NAME, 'readwrite');
-    //从事务中获取这个表的引用
     const store = transaction.objectStore(STORE_NAME);
-    //把传入的 message 添加到 IndexedDB 中的 messages 表里
     store.add(message);
   };
 
